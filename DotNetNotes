@@ -1,0 +1,78 @@
+// In Entity 
+[Table("Area", Schema = "Master")]
+ public class Area
+ {
+     public int AreaId { get; set; }
+     public string Name { get; set; }
+ }
+// model
+ public class DriverDetailsModel
+ {
+     public int VehicleId {  get; set; }
+     public int DriverId {  get; set; }
+     public DateTime FromDate { get; set; }
+ }
+ public class DriverVehicleAvailabilityModel
+ {
+     public List<AvailabilityInformation>? DriverVehicle { get; set; }
+     public List<AvailabilityInformation>? Driver { get; set; }
+     public List<AvailabilityInformation>? Vehicle { get; set; }
+ }
+ public class AvailabilityInformation
+ {
+     public string DriverName { get; set; }
+     public string VehicleName { get; set; }
+     public DateTime AssignedDate { get; set; }
+     public int DriverVehicleMappingId { get; set; }
+     public int NumberOfOrderAssigned { get; set; }
+
+ }
+ public class DriverVehicleAvailability(DeliveryDbContext deliveryDbContext) : IDriverVehicleAvailability
+ {
+     public DriverVehicleAvailabilityModel GetAvailability(DriverDetailsModel driverDetails)
+     {
+         var mappedDates = new DriverVehicleAvailabilityModel();
+
+         var query = deliveryDbContext.DriverVehicleMapping
+             .Include(s => s.Driver)
+             .Include(s => s.Vehicle)
+             .Include(s => s.ScheduleDelivery)
+             .Where(x => x.AssignedDateTime >= driverDetails.FromDate.Date &&
+                                         x.AssignedDateTime <= DateTime.Now.Date.AddMonths(3));
+
+         mappedDates.DriverVehicle = [.. query.Where(x => x.DriverId == driverDetails.DriverId &&
+                                         x.VehicleId == driverDetails.VehicleId)
+                                       .Select(x => new AvailabilityInformation()
+                                       {
+                                           DriverName=x.Driver.FirstName+" "+x.Driver.LastName,
+                                           VehicleName=x.Vehicle.Name,
+                                           AssignedDate=x.AssignedDateTime,
+                                           DriverVehicleMappingId=x.DriverVehicleMappingId,
+                                           NumberOfOrderAssigned=x.ScheduleDelivery.Count,
+                                       })];
+
+         mappedDates.Vehicle = [.. query.Where(x => x.DriverId != driverDetails.DriverId &&
+                                         x.VehicleId == driverDetails.VehicleId)
+                                  .Select(x => new AvailabilityInformation()
+                                       {
+                                           DriverName=x.Driver.FirstName+" "+x.Driver.LastName,
+                                           VehicleName=x.Vehicle.Name,
+                                           AssignedDate=x.AssignedDateTime,
+                                           DriverVehicleMappingId=x.DriverVehicleMappingId,
+                                           NumberOfOrderAssigned=x.ScheduleDelivery.Count,
+                                       })];
+
+         mappedDates.Driver = [.. query.Where(x => x.DriverId == driverDetails.DriverId &&
+                                         x.VehicleId != driverDetails.VehicleId)
+                                  .Select(x => new AvailabilityInformation()
+                                       {
+                                           DriverName=x.Driver.FirstName+" "+x.Driver.LastName,
+                                           VehicleName=x.Vehicle.Name,
+                                           AssignedDate=x.AssignedDateTime,
+                                           DriverVehicleMappingId=x.DriverVehicleMappingId,
+                                           NumberOfOrderAssigned=x.ScheduleDelivery.Count,
+                                       })];
+
+         return mappedDates;
+     }
+ }
